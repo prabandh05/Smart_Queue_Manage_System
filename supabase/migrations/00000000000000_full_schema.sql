@@ -50,7 +50,7 @@ create table if not exists public.tokens (
   notes text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  slot_date date generated always as (date(time_slot)) stored
+  slot_date date
 );
 
 create table if not exists public.notifications (
@@ -228,6 +228,26 @@ create trigger trg_prevent_past_slots_ins before insert on public.tokens for eac
 
 drop trigger if exists trg_prevent_past_slots_upd on public.tokens;
 create trigger trg_prevent_past_slots_upd before update of time_slot on public.tokens for each row execute function public.prevent_past_slots();
+
+-- Maintain slot_date from time_slot (avoid generated column immutability issues)
+create or replace function public.set_slot_date_from_time_slot()
+returns trigger as $$
+begin
+  if new.time_slot is not null then
+    new.slot_date := (new.time_slot at time zone 'UTC')::date;
+  end if;
+  return new;
+end; $$ language plpgsql security definer set search_path=public;
+
+drop trigger if exists trg_set_slot_date_ins on public.tokens;
+create trigger trg_set_slot_date_ins
+  before insert on public.tokens
+  for each row execute function public.set_slot_date_from_time_slot();
+
+drop trigger if exists trg_set_slot_date_upd on public.tokens;
+create trigger trg_set_slot_date_upd
+  before update of time_slot on public.tokens
+  for each row execute function public.set_slot_date_from_time_slot();
 
 -- Seed counters
 insert into public.counters (name, officer_name, is_active, services) values
