@@ -1,24 +1,57 @@
-# Welcome to your Lovable project
+# Smart Queue Management System (React + Supabase)
 
-## Project info
+Production-ready template for a queue system with role-based dashboards, slot booking, SMS notifications, and live display.
 
-**URL**: https://lovable.dev/projects/5cd36151-7ed0-43ce-b38e-ab10f17213b7
+## Features
+- Auth with Supabase (profiles with is_officer / is_admin)
+- Officer and citizen dashboards
+- Token generation with 30-minute slots, lunch break, capacity = 3 per service/slot
+- Disability priority flag (vision/hearing/mobility)
+- Live display (public) with realtime updates
+- SMS notifications via Supabase Edge Function (Twilio)
 
-## How can I edit this code?
+## Prerequisites
+- Node 18+ and pnpm/npm
+- Supabase project
+- Twilio account (SMS-capable number)
 
-There are several ways of editing your application.
+## Setup
+1) Install deps
+```
+npm install
+```
+2) Env (.env.local)
+```
+VITE_SUPABASE_URL=YOUR_URL
+VITE_SUPABASE_ANON_KEY=YOUR_ANON
+```
+3) Supabase SQL (run in SQL editor)
+- Apply the single setup schema at `supabase/migrations/00000000000000_full_schema.sql`.
 
-**Use Lovable**
+4) Edge Function
+- Create function `send-sms-notification` from `supabase/functions/send-sms-notification`
+- Set secrets: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/5cd36151-7ed0-43ce-b38e-ab10f17213b7) and start prompting.
+## Develop
+```
+npm run dev
+```
+Open http://localhost:5000
 
-Changes made via Lovable will be committed automatically to this repo.
+## Reset database (destructive)
+- Truncate key tables:
+```
+truncate table public.tokens restart identity cascade;
+truncate table public.counters restart identity cascade;
+truncate table public.notifications restart identity cascade;
+truncate table public.queue_stats restart identity cascade;
+truncate table public.profiles restart identity cascade;
+```
 
-**Use your preferred IDE**
+## Notes
+- Replace favicon at `public/favicon.ico` (current is React logo).
+- This project removes vendor tags and example metadata.
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 
 Follow these steps:
 
@@ -60,14 +93,3 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/5cd36151-7ed0-43ce-b38e-ab10f17213b7) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)

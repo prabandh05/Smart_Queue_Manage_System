@@ -1,27 +1,40 @@
+import "./App.css";
 import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
+import { Navigate, Outlet } from "react-router-dom";
+import { useAuth } from "./hooks/use-auth";
+import { Loader2 } from "lucide-react";
 
-const queryClient = new QueryClient();
+// Protected Route Component
+export const ProtectedRoute = ({ children, requireRole }: { children: React.ReactNode; requireRole?: 'citizen' | 'officer' | 'admin' }) => {
+  const { isAuthenticated, profile, resolvedRole, loading } = useAuth();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
+
+  const role = resolvedRole || (profile?.is_admin ? 'admin' : (profile?.is_officer ? 'officer' : 'citizen'));
+  if (requireRole && role !== requireRole && role !== 'admin') {
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+function App() {
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <Outlet />
       <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+    </div>
+  );
+}
 
 export default App;
