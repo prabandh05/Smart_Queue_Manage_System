@@ -5,6 +5,7 @@ import { Users, ClipboardCheck, Activity, Shield, LogIn, Monitor } from "lucide-
 import { Link, useNavigate } from "react-router-dom";
 import { AuthModal } from "@/components/auth/AuthModal";
 import { useAuth } from "@/hooks/use-auth";
+import { Bot } from "lucide-react";
 
 export const Index = () => {
   const [authModal, setAuthModal] = useState<{ open: boolean; mode: 'signin' | 'signup' }>({
@@ -70,7 +71,9 @@ export const Index = () => {
   ];
 
   return (
+    
     <div className="min-h-screen bg-background">
+      
       <div className="container mx-auto px-4">
         {/* Header */}
         <header className="bg-card border-b border-border shadow-sm">
@@ -86,6 +89,21 @@ export const Index = () => {
               </div>
               
               <div className="flex items-center gap-2">
+                 <Button
+    asChild
+    variant="secondary"
+    className="hidden sm:inline-flex gap-2 rounded-full shadow-sm hover:shadow-md"
+  >
+    <a
+      href="http://localhost:5173"
+      target="_blank"
+      rel="noreferrer"
+      aria-label="Open chatbot in a new tab"
+    >
+      <Bot className="h-4 w-4" />
+      Chatbot
+    </a>
+  </Button>
                 {isAuthenticated ? (
                   <>
                     <span className="text-sm text-muted-foreground">
