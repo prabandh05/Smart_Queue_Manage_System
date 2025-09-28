@@ -182,8 +182,7 @@ export const CitizenDashboard = () => {
                       <SelectItem value="16:00">16:00</SelectItem>
                       <SelectItem value="16:30">16:30</SelectItem>
                       <SelectItem value="17:00">17:00</SelectItem>
-                      <SelectItem value="17:30">17:30</SelectItem>
-                      <SelectItem value="18:00">18:00</SelectItem>
+                    
                     </SelectContent>
                   </Select>
                 </div>
