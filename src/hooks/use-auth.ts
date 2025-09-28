@@ -184,14 +184,57 @@ export const useAuth = () => {
       setProfile(null);
     }
   };
+// at top of the module (next to your cache vars)
+function resetProfileCache() {
+  inFlightProfileFetch = null;
+  cachedUserId = null;
+  cachedAt = 0;
+  cachedProfile = null;
+}
 
-  const signOut = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (error) {
-      console.error('Error signing out:', error);
+function hardClearSupabaseStorage() {
+  try {
+    // derive project ref from your URL, e.g. https://<ref>.supabase.co
+    const url = import.meta.env.VITE_SUPABASE_URL || '';
+    const match = url.match(/^https?:\/\/([^.]+)\.supabase\.co/);
+    const ref = match?.[1];
+    if (ref) {
+      // supabase-js v2 default auth storage keys
+      localStorage.removeItem(`sb-${ref}-auth-token`);
+      localStorage.removeItem(`sb-${ref}-auth-token.0`);
+      localStorage.removeItem(`sb-${ref}-auth-token.1`);
+    } else {
+      // fallback: clear anything that looks like an auth token key
+      Object.keys(localStorage).forEach((k) => {
+        if (k.startsWith('sb-') && k.endsWith('-auth-token')) localStorage.removeItem(k);
+      });
     }
-  };
+  } catch {/* ignore */}
+}
+// inside useAuth
+const signOut = async () => {
+  // 0) proactively clear your app state so UI updates immediately
+  resetProfileCache();
+  setProfile(null);
+  setUser(null);
+
+  // 1) check if there is a session
+  const { data: { session } } = await supabase.auth.getSession();
+
+  // 2) attempt local sign-out only if a session exists
+  if (session) {
+    const { error } = await supabase.auth.signOut({ scope: 'local' });
+
+    // 3) ignore "no session" style errors; log others
+    if (error && !/session_not_found|Auth session missing/i.test(error.message)) {
+      console.warn('supabase signOut warning:', error.message);
+    }
+  }
+
+  // 4) belt & suspenders: purge local storage tokens
+  hardClearSupabaseStorage();
+};
+
 
   return {
     user,

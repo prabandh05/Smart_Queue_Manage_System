@@ -179,10 +179,10 @@ export const useQueueData = () => {
       // Clamp into working windows
       const isLunch = (h: number, m: number) => (h > 13 || (h === 13 && m >= 0)) && (h < 14 || (h === 14 && m < 30));
       const beforeStart = (h: number, m: number) => h < 9 || (h === 9 && m < 0);
-      const afterEnd = (h: number, m: number) => h > 17 || (h === 17 && m > 0);
+      const afterEnd = (h: number, m: number) => h > 18 || (h === 18 && m > 0);
       if (beforeStart(hour, minute)) { hour = 9; minute = 0; }
       if (isLunch(hour, minute)) { hour = 14; minute = 30; }
-      if (afterEnd(hour, minute)) { hour = 17; minute = 0; }
+      if (afterEnd(hour, minute)) { hour = 18; minute = 0; }
       const slotIso = new Date(day.getFullYear(), day.getMonth(), day.getDate(), hour, minute, 0, 0).toISOString();
 
       // Enforce capacity: max 3 tokens per identical slot timestamp
