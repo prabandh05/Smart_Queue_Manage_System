@@ -21,6 +21,8 @@ interface Token {
   notes?: string;
   created_at: string;
   updated_at: string;
+  slot_date?: string;
+  slot_index?: number;
 }
 
 interface QueueStats {
@@ -57,7 +59,7 @@ export const useQueueData = () => {
     fetchCounters();
     fetchStats();
 
-    // Subscribe to real-time updates
+    // realtime
     const tokensSubscription = supabase
       .channel('tokens-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tokens' }, () => {
@@ -87,19 +89,45 @@ export const useQueueData = () => {
           *,
           profiles!tokens_citizen_id_fkey(full_name, phone)
         `)
+        .order('time_slot', { ascending: true })
         .order('created_at', { ascending: true });
 
       if (error) throw error;
 
-      const formattedTokens = data.map((token: any) => ({
-        ...token,
-        citizen_name: token.profiles?.full_name || 'Unknown',
-        citizen_phone: token.profiles?.phone || '',
-        time_slot: new Date(token.time_slot).toLocaleTimeString('en-IN', {
-          hour: '2-digit',
-          minute: '2-digit'
-        })
-      }));
+      // calendar
+      const computeSlotIndex = (dt: Date) => {
+        const h = dt.getHours();
+        const m = dt.getMinutes();
+        const slotTimes: Array<{h:number;m:number}> = [];
+        // calendar
+        for (let hh = 9; hh <= 12; hh++) {
+          slotTimes.push({ h: hh, m: 0 });
+          slotTimes.push({ h: hh, m: 30 });
+        }
+        // calendar
+        const afternoon: Array<[number, number]> = [[14,30],[15,0],[15,30],[16,0],[16,30],[17,0]];
+        afternoon.forEach(([hh, mm]) => slotTimes.push({ h: hh, m: mm }));
+        for (let i = 0; i < slotTimes.length; i++) {
+          if (slotTimes[i].h === h && slotTimes[i].m === m) return i + 1;
+        }
+        // calendar
+        return Math.max(1, Math.floor(((h - 9) * 60 + m) / 30) + 1);
+      };
+
+      const formattedTokens = data.map((token: any) => {
+        const ts = new Date(token.time_slot);
+        return {
+          ...token,
+          citizen_name: token.profiles?.full_name || 'Unknown',
+          citizen_phone: token.profiles?.phone || '',
+          time_slot: ts.toLocaleTimeString('en-IN', {
+            hour: '2-digit',
+            minute: '2-digit'
+          }),
+          slot_date: token.slot_date || ts.toISOString().split('T')[0],
+          slot_index: computeSlotIndex(ts)
+        };
+      });
 
       setTokens(formattedTokens);
     } catch (error: any) {
@@ -136,8 +164,7 @@ export const useQueueData = () => {
       const { data: todayTokens, error } = await supabase
         .from('tokens')
         .select('*')
-        .gte('created_at', `${today}T00:00:00`)
-        .lt('created_at', `${today}T23:59:59`);
+        .eq('slot_date', today);
 
       if (error) throw error;
 
@@ -148,7 +175,7 @@ export const useQueueData = () => {
       setStats({
         totalTokens,
         currentlyServing,
-        averageWaitTime: 25, // Calculate based on actual wait times
+        averageWaitTime: 25,
         completedToday
       });
     } catch (error: any) {
@@ -162,21 +189,15 @@ export const useQueueData = () => {
     opts?: { desiredSlot?: Date; disability?: 'vision' | 'hearing' | 'mobility' }
   ): Promise<Token | null> => {
     try {
-      // Get token number
-      const { data: tokenNumber, error: numberError } = await supabase
-        .rpc('generate_token_number');
-
-      if (numberError) throw numberError;
-
-      // Calculate/choose time slot (10 minutes granularity). Allow explicit desired slot.
+      // calendar
       const now = new Date();
       const day = opts?.desiredSlot ? new Date(opts.desiredSlot) : now;
-      // Slot plan: 30-min slots from 09:00 to 13:00, skip lunch 13:00-14:30, then 14:30 to 17:00
+      // calendar
       const minutes = [0, 30];
       const proposed = opts?.desiredSlot ? new Date(opts.desiredSlot) : new Date(day.getFullYear(), day.getMonth(), day.getDate(), 9, 0);
       let hour = proposed.getHours();
       let minute = minutes.reduce((prev, cur) => Math.abs(cur - proposed.getMinutes()) < Math.abs(prev - proposed.getMinutes()) ? cur : prev, 0);
-      // Clamp into working windows
+      // calendar
       const isLunch = (h: number, m: number) => (h > 13 || (h === 13 && m >= 0)) && (h < 14 || (h === 14 && m < 30));
       const beforeStart = (h: number, m: number) => h < 9 || (h === 9 && m < 0);
       const afterEnd = (h: number, m: number) => h > 17 || (h === 17 && m > 0);
@@ -185,8 +206,19 @@ export const useQueueData = () => {
       if (afterEnd(hour, minute)) { hour = 17; minute = 0; }
       const slotIso = new Date(day.getFullYear(), day.getMonth(), day.getDate(), hour, minute, 0, 0).toISOString();
 
-      // Enforce capacity: max 3 tokens per identical slot timestamp
-      // Capacity per service per slot: 3
+      // Compute slot index number for code (1..N per day)
+      const computeSlotIndex = (dt: Date) => {
+        const h = dt.getHours();
+        const m = dt.getMinutes();
+        const slots: Array<[number, number]> = [];
+        for (let hh = 9; hh <= 12; hh++) { slots.push([hh,0]); slots.push([hh,30]); }
+        [[14,30],[15,0],[15,30],[16,0],[16,30],[17,0]].forEach(s => slots.push(s as [number, number]));
+        for (let i = 0; i < slots.length; i++) { if (slots[i][0] === h && slots[i][1] === m) return i + 1; }
+        return Math.max(1, Math.floor(((h - 9) * 60 + m) / 30) + 1);
+      };
+      const tokenNumber = computeSlotIndex(new Date(slotIso));
+
+      // capacity
       const { count: slotCount, error: slotErr } = await supabase
         .from('tokens')
         .select('id', { count: 'exact', head: true })
@@ -198,7 +230,7 @@ export const useQueueData = () => {
         throw new Error('Selected time slot is full. Please choose another time.');
       }
 
-      // Generate QR code
+      // qr
       const qrData = JSON.stringify({
         tokenNumber,
         citizenId,
@@ -238,7 +270,7 @@ export const useQueueData = () => {
         })
       } as Token;
 
-      // Send SMS notification
+      // notification zone
       try {
         await supabase.functions.invoke('send-sms-notification', {
           body: {
@@ -290,7 +322,7 @@ export const useQueueData = () => {
 
       if (error) throw error;
 
-      // Send SMS notification for status updates
+      // notification zone
       if (status === 'serving' || status === 'completed') {
         try {
           await supabase.functions.invoke('send-sms-notification', {
@@ -304,30 +336,29 @@ export const useQueueData = () => {
         }
       }
 
-      // When a token moves to serving, notify the next two waiting tokens (up_next)
+      // notification zone
       if (status === 'serving') {
         try {
-          // Get current token details
+          // notification zone
           const { data: currentToken } = await supabase
             .from('tokens')
-            .select('token_number, service_type')
+            .select('token_number, service_type, slot_date, time_slot')
             .eq('id', tokenId)
             .single();
 
           if (currentToken) {
-            const { data: nextTokens } = await supabase
+            // notification zone
+            const { data: upcoming } = await supabase
               .from('tokens')
-              .select('id, token_number')
+              .select('id, token_number, time_slot')
               .eq('status', 'waiting')
               .eq('service_type', currentToken.service_type)
-              .order('token_number', { ascending: true })
-              .limit(10);
+              .eq('slot_date', currentToken.slot_date)
+              .order('time_slot', { ascending: true })
+              .order('created_at', { ascending: true })
+              .limit(2);
 
-            if (nextTokens && nextTokens.length > 0) {
-              // pick the next two by token_number greater than current
-              const upcoming = nextTokens
-                .filter(t => t.token_number > currentToken.token_number)
-                .slice(0, 2);
+            if (upcoming && upcoming.length > 0) {
               await Promise.all(
                 upcoming.map(t =>
                   supabase.functions.invoke('send-sms-notification', {

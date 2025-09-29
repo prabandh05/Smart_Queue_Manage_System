@@ -13,13 +13,32 @@ export const LiveQueueDisplay = () => {
     return () => clearInterval(timer);
   }, []);
 
-  const servingTokens = tokens.filter(t => t.status === 'serving');
-  const waitingTokens = tokens.filter(t => t.status === 'waiting').slice(0, 10);
+  const today = new Date().toISOString().split('T')[0];
+  const dayTokens = tokens.filter(t => t.slot_date === today);
+  const servingTokens = dayTokens.filter(t => t.status === 'serving');
+  const waitingTokensRaw = dayTokens.filter(t => t.status === 'waiting');
+  const slotGroups: Record<number, any[]> = dayTokens.reduce((acc: Record<number, any[]>, t: any) => {
+    const key = t.slot_index || 0;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(t);
+    return acc;
+  }, {});
+  Object.keys(slotGroups).forEach(k => {
+    slotGroups[Number(k)].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  });
+  const getDisplayCode = (t: any) => {
+    const idx = (slotGroups[t.slot_index || 0] || []).findIndex(x => x.id === t.id);
+    const letter = String.fromCharCode(65 + (idx >= 0 ? idx : 0));
+    return `${t.slot_index}${letter}`;
+  };
+  const waitingTokens = waitingTokensRaw
+    .sort((a, b) => (a.slot_index || 0) - (b.slot_index || 0))
+    .slice(0, 15);
   
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 to-secondary/5 p-4">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
+      {/* header */}
         <Card className="p-6 bg-primary text-primary-foreground">
           <div className="flex items-center justify-between">
             <div>
@@ -37,7 +56,7 @@ export const LiveQueueDisplay = () => {
           </div>
         </Card>
 
-        {/* Stats Overview */}
+      {/* stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card className="p-4 text-center">
             <Users className="h-8 w-8 mx-auto mb-2 text-primary" />
@@ -61,7 +80,7 @@ export const LiveQueueDisplay = () => {
           </Card>
         </div>
 
-        {/* Currently Serving */}
+      {/* notification zone */}
         <Card className="p-6">
           <h2 className="text-2xl font-semibold mb-4 flex items-center gap-2">
             <Activity className="h-6 w-6 text-warning" />
@@ -78,7 +97,7 @@ export const LiveQueueDisplay = () => {
                 <Card key={token.id} className="p-4 bg-warning/10 border-warning">
                   <div className="flex items-center justify-between mb-2">
                     <div className="text-3xl font-bold text-warning">
-                      #{token.token_number}
+                      #{getDisplayCode(token)}
                     </div>
                     <Badge className="bg-warning text-warning-foreground">
                       Counter {token.counter_id}
@@ -96,7 +115,7 @@ export const LiveQueueDisplay = () => {
           )}
         </Card>
 
-        {/* Next in Queue */}
+      {/* notification zone */}
         <Card className="p-6">
           <h2 className="text-2xl font-semibold mb-4 flex items-center gap-2">
             <Clock className="h-6 w-6 text-primary" />
@@ -108,11 +127,11 @@ export const LiveQueueDisplay = () => {
               No tokens waiting in queue
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               {waitingTokens.map((token, index) => (
                 <Card key={token.id} className={`p-3 text-center ${index === 0 ? 'bg-primary/10 border-primary' : ''}`}>
                   <div className={`text-xl font-bold ${index === 0 ? 'text-primary' : 'text-muted-foreground'}`}>
-                    #{token.token_number}
+                    #{getDisplayCode(token)}
                   </div>
                   <div className="text-xs text-muted-foreground truncate">
                     {token.citizen_name}
@@ -131,7 +150,7 @@ export const LiveQueueDisplay = () => {
           )}
         </Card>
 
-        {/* Counter Status */}
+      {/* status */}
         <Card className="p-6">
           <h2 className="text-2xl font-semibold mb-4">Counter Status</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -149,7 +168,7 @@ export const LiveQueueDisplay = () => {
                     <div>Officer: {counter.officer_name || "Available"}</div>
                     {activeToken && (
                       <div className="font-medium text-primary">
-                        Serving: #{activeToken.token_number}
+                        Serving: #{getDisplayCode(activeToken)}
                       </div>
                     )}
                   </div>

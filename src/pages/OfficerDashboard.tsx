@@ -21,10 +21,11 @@ export const OfficerDashboard = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCounter, setSelectedCounter] = useState<string>("1");
   const [serviceFilter, setServiceFilter] = useState<string | "all">("all");
+  const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
 
   useEffect(() => {
     if (counters.length > 0) {
-      // Ensure selectedCounter points to a real counter id
+  // header
       const firstId = counters[0].id.toString();
       setSelectedCounter((prev) => (counters.some(c => c.id.toString() === prev) ? prev : firstId));
     }
@@ -74,16 +75,35 @@ export const OfficerDashboard = () => {
   )
     .filter(token => serviceFilter === 'all' ? true : token.service_type === serviceFilter);
 
-  const waitingTokens = filteredTokens.filter(t => t.status === 'waiting');
-  const servingTokens = filteredTokens.filter(t => t.status === 'serving');
-  const completedTokens = filteredTokens.filter(t => t.status === 'completed').slice(0, 10);
+  // calendar
+  const dayTokens = filteredTokens.filter(t => t.slot_date === selectedDate);
+  const waitingTokens = dayTokens.filter(t => t.status === 'waiting');
+  const servingTokens = dayTokens.filter(t => t.status === 'serving');
+  const completedTokens = dayTokens.filter(t => t.status === 'completed').slice(0, 10);
+
+  // slots
+  const slotGroups: Record<number, any[]> = dayTokens.reduce((acc: Record<number, any[]>, t: any) => {
+    const key = t.slot_index || 0;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(t);
+    return acc;
+  }, {});
+  // slots
+  Object.keys(slotGroups).forEach(k => {
+    slotGroups[Number(k)].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  });
+  const getDisplayCode = (t: any) => {
+    const idx = (slotGroups[t.slot_index || 0] || []).findIndex(x => x.id === t.id);
+    const letter = String.fromCharCode(65 + (idx >= 0 ? idx : 0));
+    return `${t.slot_index}${letter}`;
+  };
 
   const QueueManagementContent = () => (
     <div className="space-y-8">
-      {/* Queue Statistics */}
+      {/* stats */}
       <QueueStats stats={stats} />
 
-      {/* Search and Controls */}
+      {/* controls */}
       <Card className="p-4">
         <div className="flex items-center gap-4">
           <div className="relative flex-1">
@@ -95,6 +115,12 @@ export const OfficerDashboard = () => {
               className="pl-10"
             />
           </div>
+          <Input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="w-40"
+          />
           <Select value={serviceFilter} onValueChange={setServiceFilter}>
             <SelectTrigger className="w-40">
               <SelectValue placeholder="All services" />
@@ -113,12 +139,14 @@ export const OfficerDashboard = () => {
         </div>
       </Card>
 
-      {/* Currently Serving */}
+      {/* notification zone */}
       {servingTokens.length > 0 && (
         <div className="space-y-4">
           <h2 className="text-xl font-semibold">Currently Being Served</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {servingTokens.map((token) => (
+            {servingTokens
+              .sort((a, b) => (a.slot_index || 0) - (b.slot_index || 0))
+              .map((token) => (
               <div key={token.id} className="space-y-2">
                 <TokenCard token={{
                   ...token,
@@ -128,7 +156,7 @@ export const OfficerDashboard = () => {
                   timeSlot: token.time_slot,
                   estimatedTime: token.estimated_time,
                   createdAt: new Date(token.created_at)
-                }} />
+                }} displayCode={getDisplayCode(token)} />
                 <div className="flex gap-2">
                   <Button
                     size="sm"
@@ -165,7 +193,7 @@ export const OfficerDashboard = () => {
         </div>
       )}
 
-      {/* Waiting Queue */}
+      {/* queue */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold">Waiting Queue ({waitingTokens.length})</h2>
@@ -179,45 +207,59 @@ export const OfficerDashboard = () => {
             <p className="text-muted-foreground">No tokens waiting in queue</p>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {waitingTokens.map((token) => (
-              <div key={token.id} className="space-y-2">
-                <TokenCard token={{
-                  ...token,
-                  number: token.token_number,
-                  citizenName: token.citizen_name,
-                  citizenId: token.citizen_phone,
-                  timeSlot: token.time_slot,
-                  estimatedTime: token.estimated_time,
-                  createdAt: new Date(token.created_at)
-                }} />
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    onClick={() => handleStatusUpdate(token, 'serving')}
-                    className="flex-1 gap-1"
-                    disabled={loading}
-                  >
-                    <Play className="h-4 w-4" />
-                    Call for Service
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => sendReminder(token)}
-                    className="gap-1"
-                  >
-                    <Bell className="h-4 w-4" />
-                    Remind
-                  </Button>
-                </div>
-              </div>
-            ))}
+          <div className="space-y-6">
+      {/* slots */}
+            {Object.keys(slotGroups)
+              .map(n => Number(n))
+              .sort((a, b) => a - b)
+              .map(slotIdx => {
+                const group = (slotGroups[slotIdx] || []).filter(t => t.status === 'waiting');
+                if (group.length === 0) return null;
+                return (
+                  <div key={slotIdx}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {group.map((token) => (
+                        <div key={token.id} className="space-y-2">
+                          <TokenCard token={{
+                            ...token,
+                            number: token.token_number,
+                            citizenName: token.citizen_name,
+                            citizenId: token.citizen_phone,
+                            timeSlot: token.time_slot,
+                            estimatedTime: token.estimated_time,
+                            createdAt: new Date(token.created_at)
+                          }} displayCode={getDisplayCode(token)} />
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => handleStatusUpdate(token, 'serving')}
+                              className="flex-1 gap-1"
+                              disabled={loading}
+                            >
+                              <Play className="h-4 w-4" />
+                              Call for Service
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => sendReminder(token)}
+                              className="gap-1"
+                            >
+                              <Bell className="h-4 w-4" />
+                              Remind
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
           </div>
         )}
       </div>
 
-      {/* Recently Completed */}
+      {/* completed */}
       {completedTokens.length > 0 && (
         <div className="space-y-4">
           <h2 className="text-xl font-semibold">Recently Completed</h2>
@@ -241,7 +283,7 @@ export const OfficerDashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
+      {/* header */}
       <header className="bg-card border-b border-border shadow-sm">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -284,7 +326,7 @@ export const OfficerDashboard = () => {
       </header>
 
       <div className="container mx-auto px-4 py-8 space-y-8">
-        {/* Main Content with Tabs for Admins */}
+      {/* front page */}
         {isAdmin ? (
           <Tabs defaultValue="queue" className="space-y-6">
             <TabsList className="grid w-full grid-cols-2">

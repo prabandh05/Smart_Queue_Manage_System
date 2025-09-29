@@ -21,7 +21,7 @@ export const CitizenDashboard = () => {
   const [selectedTime, setSelectedTime] = useState<string>("");
   const [disability, setDisability] = useState<"none" | "vision" | "hearing" | "mobility">("none");
 
-  // Get current user's tokens
+  // header
   const userTokens = tokens.filter(token => 
     token.citizen_id === profile?.id
   );
@@ -45,12 +45,12 @@ export const CitizenDashboard = () => {
       return;
     }
 
-    // Build desired slot Date object from selected date and HH:mm
+  // calendar
     const [hh, mm] = selectedTime.split(":").map(Number);
     const base = new Date(selectedDate + "T00:00:00");
     const desiredSlot = new Date(base.getFullYear(), base.getMonth(), base.getDate(), hh || 0, mm || 0, 0, 0);
 
-    // Prevent past slot selection (client-side guard)
+  // calendar
     if (desiredSlot.getTime() < Date.now()) {
       toast({ title: "Invalid Slot", description: "Please pick a future time slot", variant: "destructive" });
       return;
@@ -82,7 +82,7 @@ export const CitizenDashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
+      {/* header */}
       <header className="bg-card border-b border-border shadow-sm">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -118,10 +118,10 @@ export const CitizenDashboard = () => {
       </header>
 
       <div className="container mx-auto px-4 py-8 space-y-8">
-        {/* Queue Statistics */}
+      {/* stats */}
         <QueueStats stats={stats} />
 
-        {/* Token Generation */}
+      {/* front page */}
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold">Generate New Token</h2>
@@ -165,7 +165,7 @@ export const CitizenDashboard = () => {
                       <SelectValue placeholder="Select time" />
                     </SelectTrigger>
                     <SelectContent>
-                      {/* Morning 09:00 to 13:00 (exclusive of 13:00 for lunch) */}
+      {/* calendar */}
                       <SelectItem value="09:00">09:00</SelectItem>
                       <SelectItem value="09:30">09:30</SelectItem>
                       <SelectItem value="10:00">10:00</SelectItem>
@@ -174,14 +174,15 @@ export const CitizenDashboard = () => {
                       <SelectItem value="11:30">11:30</SelectItem>
                       <SelectItem value="12:00">12:00</SelectItem>
                       <SelectItem value="12:30">12:30</SelectItem>
-                      {/* Lunch 13:00 - 14:30 (disabled) */}
-                      {/* Afternoon 14:30 to 17:00 */}
+      {/* calendar */}
+      {/* calendar */}
                       <SelectItem value="14:30">14:30</SelectItem>
                       <SelectItem value="15:00">15:00</SelectItem>
                       <SelectItem value="15:30">15:30</SelectItem>
                       <SelectItem value="16:00">16:00</SelectItem>
                       <SelectItem value="16:30">16:30</SelectItem>
                       <SelectItem value="17:00">17:00</SelectItem>
+                      
                     
                     </SelectContent>
                   </Select>
@@ -213,7 +214,7 @@ export const CitizenDashboard = () => {
           )}
         </Card>
 
-        {/* Your Tokens */}
+      {/* queue */}
         <div className="space-y-4">
           <h2 className="text-xl font-semibold">Your Tokens</h2>
           {userTokens.length === 0 ? (
@@ -254,7 +255,7 @@ export const CitizenDashboard = () => {
           )}
         </div>
 
-        {/* Currently Being Served */}
+      {/* notification zone */}
         {currentlyServing.length > 0 && (
           <div className="space-y-4">
             <h2 className="text-xl font-semibold">Currently Being Served</h2>
@@ -274,7 +275,7 @@ export const CitizenDashboard = () => {
           </div>
         )}
 
-        {/* Next in Queue */}
+      {/* notification zone */}
         {nextInQueue.length > 0 && (
           <div className="space-y-4">
             <h2 className="text-xl font-semibold">Next in Queue</h2>

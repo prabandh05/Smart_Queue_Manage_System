@@ -6,9 +6,10 @@ import { Clock, User, CreditCard } from "lucide-react";
 interface TokenCardProps {
   token: Token;
   isCurrentUser?: boolean;
+  displayCode?: string; // optional: e.g., 1A, 1B, 1C
 }
 
-export const TokenCard = ({ token, isCurrentUser = false }: TokenCardProps) => {
+export const TokenCard = ({ token, isCurrentUser = false, displayCode }: TokenCardProps) => {
   const getStatusVariant = (status: Token['status']) => {
     switch (status) {
       case 'serving':
@@ -32,7 +33,7 @@ export const TokenCard = ({ token, isCurrentUser = false }: TokenCardProps) => {
     }`}>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <div className="text-2xl font-bold text-primary">#{token.number}</div>
+          <div className="text-2xl font-bold text-primary">#{displayCode ?? token.number}</div>
           {token.priority && (
             <div className="px-2 py-1 bg-accent text-accent-foreground text-xs rounded-full font-medium">
               Priority
