@@ -1,5 +1,4 @@
--- Fresh schema for Smart Queue Management System
--- Run this on a new project to create all objects (tables, RLS, funcs, triggers, indexes)
+--Schema for Smart Queue Management System
 
 -- Extensions
 create extension if not exists pgcrypto;

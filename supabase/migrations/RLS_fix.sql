@@ -1,5 +1,4 @@
--- Fix RLS infinite recursion by removing self-referencing policy on profiles
--- and switch officer/admin checks to JWT user_metadata claims
+-- Fix RLS 
 
 -- PROFILES
 DROP POLICY IF EXISTS "Officers can view all profiles" ON public.profiles;
@@ -29,7 +28,6 @@ CREATE POLICY "Officers can update all tokens" ON public.tokens
     COALESCE((auth.jwt() -> 'user_metadata' ->> 'role') IN ('officer','admin'), false)
   );
 
--- Optional: keep citizen policies as-is since they rely on matching their own profile id
--- and do not cause recursion on profiles policies.
+
 
 
